@@ -1,0 +1,31 @@
+.wrapper {
+  margin: 32px;
+  display: flex;
+  gap: 24px;
+}
+
+.canvasWrapper {
+  width: 60%;
+  position: relative;
+}
+
+.operations {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  z-index: 1;
+}
+
+.circle {
+  fill: #f00;
+}
+
+.line {
+  stroke: #000;
+}
+
+.mainCanvas {
+  width: 100%;
+  height: 100%;
+}
