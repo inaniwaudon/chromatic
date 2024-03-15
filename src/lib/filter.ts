@@ -1,4 +1,9 @@
-import type { Point } from "./utils";
+import type { Point, PointRange } from "./utils";
+
+export interface ChromaticOptions {
+  shift: number;
+  blur: number;
+}
 
 export interface VinettingOptions {
   width: number;
@@ -109,12 +114,19 @@ export class FilterCanvas {
   }
 
   /**
-   * 出力する
+   * 合成する
    */
-  composite(point: { from?: Point; to?: Point }) {
-    const dstCanvas = new OffscreenCanvas(this.width, this.height);
-    const dstContext = dstCanvas.getContext("2d");
-    if (!dstContext) {
+  private composite(point: PointRange, crop: number) {
+    // クロップ
+    const cropWidth = this.width * (crop / 100);
+    const cropHeight = this.height * (crop / 100);
+
+    const compositedCanvas = new OffscreenCanvas(
+      this.width - cropWidth * 2,
+      this.height - cropHeight * 2,
+    );
+    const compositedContext = compositedCanvas.getContext("2d");
+    if (!compositedContext) {
       throw new Error("Failed to getContext");
     }
 
@@ -124,7 +136,7 @@ export class FilterCanvas {
       throw new Error("Failed to getContext");
     }
 
-    // 合成用グラデーション
+    // 合成用グラデーションを描画
     if (point.from && point.to) {
       const fromX = point.from[0] * this.width;
       const fromY = point.from[1] * this.height;
@@ -152,9 +164,45 @@ export class FilterCanvas {
     gradientContext.globalCompositeOperation = "source-out";
     gradientContext.drawImage(this.filterCanvas, 0, 0);
 
-    dstContext.drawImage(this.canvas, 0, 0);
-    dstContext.drawImage(gradientCanvas, 0, 0);
-    dstContext.drawImage(this.vinettingCanvas, 0, 0);
+    // 合成
+    compositedContext.drawImage(this.canvas, -cropWidth, -cropHeight);
+    compositedContext.drawImage(gradientCanvas, -cropWidth, -cropHeight);
+    compositedContext.drawImage(this.vinettingCanvas, -cropWidth, -cropHeight);
+    return compositedCanvas;
+  }
+
+  output(point: PointRange, crop: number, aspect: Point) {
+    const canvas = this.composite(point, crop);
+
+    let width = 0;
+    let height = 0;
+
+    // アスペクト比が横長
+    if (aspect[0] > aspect[1]) {
+      height = canvas.height;
+      width = canvas.height * (aspect[0] / aspect[1]);
+    }
+    // アスペクト比が縦長
+    if (aspect[0] < aspect[1]) {
+      width = canvas.width;
+      height = canvas.width * (aspect[1] / aspect[0]);
+    }
+    // アスペクト比が正方形
+    if (aspect[0] === aspect[1]) {
+      width = height = Math.max(canvas.width, canvas.height);
+    }
+
+    const dstCanvas = new OffscreenCanvas(width, height);
+    const dstContext = dstCanvas.getContext("2d");
+    if (!dstContext) {
+      throw new Error("Failed to getContext");
+    }
+
+    const x = (dstCanvas.width - canvas.width) / 2;
+    const y = (dstCanvas.height - canvas.height) / 2;
+    dstContext.fillStyle = "#000";
+    dstContext.fillRect(0, 0, width, height);
+    dstContext.drawImage(canvas, x, y);
     return dstCanvas;
   }
 }
